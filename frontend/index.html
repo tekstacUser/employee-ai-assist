@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Employee AI Assistant</title>
+<style>
+  body { font-family: sans-serif; max-width: 640px; margin: 40px auto; }
+  #log { border: 1px solid #ccc; padding: 12px; height: 360px; overflow-y: auto; margin-bottom: 12px; }
+  .msg-user { color: #1a1a1a; font-weight: bold; }
+  .msg-bot { color: #2a5d9f; margin-bottom: 10px; }
+  select, input, button { padding: 6px; }
+</style>
+</head>
+<body>
+  <h2>Employee AI Assistant (on-prem)</h2>
+  <div id="log"></div>
+  <select id="bu">
+    <option value="hr">HR</option>
+    <option value="it">IT</option>
+    <option value="finance">Finance</option>
+  </select>
+  <select id="tier">
+    <option value="simple-tier">Simple</option>
+    <option value="standard-tier" selected>Standard</option>
+    <option value="complex-tier">Complex</option>
+  </select>
+  <input id="input" size="40" placeholder="Ask an HR/IT question..." />
+  <button onclick="send()">Send</button>
+
+  <script>
+    async function send() {
+      const input = document.getElementById('input');
+      const log = document.getElementById('log');
+      const message = input.value.trim();
+      if (!message) return;
+      log.innerHTML += `<div class="msg-user">You: ${message}</div>`;
+      input.value = '';
+
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          message,
+          business_unit: document.getElementById('bu').value,
+          tier_hint: document.getElementById('tier').value,
+        }),
+      });
+      const data = await res.json();
+      log.innerHTML += `<div class="msg-bot">Assistant (${data.model_used}): ${data.reply}</div>`;
+      log.scrollTop = log.scrollHeight;
+    }
+  </script>
+</body>
+</html>

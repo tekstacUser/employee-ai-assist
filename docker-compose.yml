@@ -1,0 +1,155 @@
+version: "3.9"
+
+# Employee AI Assistant — fully on-premise stack.
+# No service in this file talks to anything outside the Docker network
+# except to pull images/models on first run. Everything runs in this VM.
+
+networks:
+  llmops-net:
+    driver: bridge
+
+volumes:
+  ollama-data:
+  postgres-data:
+  langfuse-data:
+
+services:
+
+  # ---------------------------------------------------------------------
+  # Local model server. Llama 3.1 8B and Mistral are pulled manually after
+  # first boot (see README 1.6) so the image build stays fast.
+  # ---------------------------------------------------------------------
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    restart: unless-stopped
+    environment:
+      # Keeps RAM use predictable on small VMs (e.g. 8GB) by only ever
+      # holding one model in memory at a time and limiting parallel
+      # requests per model. Raise these if you move to a bigger VM.
+      - OLLAMA_MAX_LOADED_MODELS=3
+      - OLLAMA_NUM_PARALLEL=3
+    volumes:
+      - ollama-data:/root/.ollama
+    networks:
+      - llmops-net
+    ports:
+      - "11434:11434"   # exposed for local debugging only
+
+  # ---------------------------------------------------------------------
+  # LiteLLM proxy: the single routing layer the backend talks to.
+  # Config (model aliases, router_settings, fallbacks) lives in
+  # litellm/config.yaml — this is the focus of Coding Question 1.
+  # ---------------------------------------------------------------------
+  litellm:
+    image: ghcr.io/berriai/litellm:main-latest
+    container_name: litellm
+    restart: unless-stopped
+    command: ["--config", "/app/config.yaml", "--port", "4000"]
+    environment:
+      - LITELLM_MASTER_KEY=${LITELLM_MASTER_KEY}
+      - LANGFUSE_PUBLIC_KEY=${LANGFUSE_PUBLIC_KEY}
+      - LANGFUSE_SECRET_KEY=${LANGFUSE_SECRET_KEY}
+      - LANGFUSE_HOST=${LANGFUSE_HOST}
+      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL}
+    volumes:
+      - ./litellm/config.yaml:/app/config.yaml:ro
+    depends_on:
+      - ollama
+      - langfuse
+    networks:
+      - llmops-net
+    ports:
+      - "4001:4000"
+
+  # ---------------------------------------------------------------------
+  # Postgres backs both LangFuse and the app's own minimal storage.
+  # ---------------------------------------------------------------------
+  postgres:
+    image: postgres:16-alpine
+    container_name: postgres
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - llmops-net
+    ports:
+      - "5433:5432"
+
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    restart: unless-stopped
+    networks:
+      - llmops-net
+
+  # ---------------------------------------------------------------------
+  # LangFuse: observability sink for LiteLLM's success_callback, source
+  # of cost/latency/drift data for the cq1 alert + cost-model gaps.
+  # ---------------------------------------------------------------------
+  langfuse:
+    image: langfuse/langfuse:2
+    container_name: langfuse
+    restart: unless-stopped
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      - NEXTAUTH_SECRET=${LANGFUSE_NEXTAUTH_SECRET}
+      - NEXTAUTH_URL=http://localhost:3000
+      - SALT=${LANGFUSE_SALT}
+      - REDIS_CONNECTION_STRING=redis://redis:6379
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - llmops-net
+    ports:
+      - "3001:3000"
+
+  # ---------------------------------------------------------------------
+  # FastAPI backend: thin app layer between the frontend and LiteLLM.
+  # ---------------------------------------------------------------------
+  backend:
+    build: ./backend
+    container_name: backend
+    restart: unless-stopped
+    environment:
+      - LITELLM_BASE_URL=http://litellm:4000
+      - LITELLM_MASTER_KEY=${LITELLM_MASTER_KEY}
+    volumes:
+      - ./data:/app/data:ro
+    depends_on:
+      - litellm
+    networks:
+      - llmops-net
+
+  # ---------------------------------------------------------------------
+  # Static chat UI, served by its own tiny nginx, fronted by the main
+  # reverse-proxy nginx below.
+  # ---------------------------------------------------------------------
+  frontend:
+    build: ./frontend
+    container_name: frontend
+    restart: unless-stopped
+    networks:
+      - llmops-net
+
+  # ---------------------------------------------------------------------
+  # Single public entry point. Routes / to frontend, /api to backend.
+  # ---------------------------------------------------------------------
+  nginx:
+    image: nginx:alpine
+    container_name: nginx
+    restart: unless-stopped
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - frontend
+      - backend
+    networks:
+      - llmops-net
+    ports:
+      - "8082:80"

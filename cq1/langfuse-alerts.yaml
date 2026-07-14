@@ -1,0 +1,49 @@
+# cq1/langfuse-alerts.yaml
+#
+# LangFuse alert definitions for Sub-section 1.4 (Observability) and
+# Sub-section 1.5 (DR Runbook triggers). This file is a design artifact —
+# in this on-prem deployment, configure equivalent alerts in the LangFuse
+# UI (Settings > Alerts) once the stack is running, but record the
+# canonical definitions here so they can be reviewed.
+
+alerts:
+
+  # --- Sub-section 1.4, Gap 1 (2 marks) --------------------------------
+  - name: p99-latency-breach
+    metric:        # TODO: e.g. "latency_p99_ms"
+    threshold:     # TODO: must be consistent with the scenario SLA
+    evaluation_window_minutes:   # TODO
+    escalation_action:           # TODO: e.g. "page on-call via Slack webhook"
+
+  # --- Sub-section 1.4, Gap 2 (2 marks) --------------------------------
+  - name: per-bu-cost-spike
+    metric:        # TODO: e.g. "cost_usd_equivalent_per_bu"
+    threshold:     # TODO: must reference the budget limit from cost-model.md
+    evaluation_window_minutes:   # TODO
+    escalation_action:           # TODO
+
+  # --- Sub-section 1.5, Gap 1 — AP1 trigger (1 mark) -------------------
+  # AP1: Primary Complex-tier endpoint returns 5xx for 4 consecutive
+  # minutes; circuit-breaker has not triggered; requests are queuing.
+  - name: ap1-complex-tier-error-rate
+    metric: error_rate
+    threshold:     # TODO
+    evaluation_window_minutes:   # TODO
+    escalation_action: trigger-dr-runbook-step-3
+
+  # --- Sub-section 1.5, Gap 1 — AP2 trigger (1 mark) -------------------
+  # AP2: Token costs for one BU spike 340% in 90 minutes (prompt
+  # injection loop); auto-throttling did not activate.
+  - name: ap2-bu-cost-spike-override
+    metric: cost_usd_equivalent_per_bu
+    threshold:     # TODO — must reference the per-BU budget from cost-model.md
+    evaluation_window_minutes: 90
+    escalation_action: trigger-dr-runbook-step-3
+
+  # --- AP3 reference (handled via hallucination metric, see
+  #     observability-spec.md Gap 4 — not duplicated here) -------------
+  - name: ap3-hallucination-rate-trend
+    metric: hallucination_rate
+    threshold:     # see observability-spec.md
+    evaluation_window_minutes:   # see observability-spec.md
+    escalation_action: trigger-dr-runbook-step-7
