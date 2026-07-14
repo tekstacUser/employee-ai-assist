@@ -1,69 +1,104 @@
+# litellm/config.yaml
+#
+# LIVE CONFIG — LiteLLM loads this file directly. Every value you set here
+# changes the chatbot's real routing, fallback, and cost-control behavior.
+# Do not rename model_name, tier labels, or top-level keys — the grader
+# depends on these exact names.
+#
+# Fill every # TODO (Gap N) below. Gaps 1-4 size the three model tiers,
+# Gaps 5-9 configure routing/fallback, Gap 10 enforces per-BU budgets.
+
 model_list:
- 
+
+  # --- Gap 1 (model choice — Simple tier) ------------------------------
+  # Simple tier: the smallest model you pulled in Step 3. Handles
+  # high-volume, low-complexity requests (FAQs, lookups, greetings).
   - model_name: simple-tier
- 
     litellm_params:
-      model: ollama/qwen2.5:1.5b
+      model:                    # TODO (Gap 1): ollama/<model>:<size>
       api_base: os.environ/OLLAMA_BASE_URL
- 
-    model_info:
-      input_cost_per_token: 0.00000015
-      output_cost_per_token: 0.00000015
- 
- 
+      health_check_interval:    # TODO (Gap 4): seconds between Ollama health checks
+
+  # --- Gap 2 (model choice — Standard tier) ----------------------------
+  # Standard tier: mid-capability model for everyday multi-step questions
+  # (report generation, troubleshooting, policy explanation).
   - model_name: standard-tier
- 
     litellm_params:
-      model: ollama/llama3.2:3b
+      model:                    # TODO (Gap 2): ollama/<model>:<size>
       api_base: os.environ/OLLAMA_BASE_URL
- 
-    model_info:
-      input_cost_per_token: 0.00000030
-      output_cost_per_token: 0.00000030
- 
- 
+      health_check_interval:    # TODO (Gap 4): same value as Simple tier, or justify a different one
+
+  # --- Gap 3 (model choice — Complex tier) -----------------------------
+  # Complex tier: reserved for the hardest, highest-stakes questions
+  # (policy interpretation, financial analysis, compliance, escalations).
   - model_name: complex-tier
- 
     litellm_params:
-      model: ollama/llama3.2:3b
+      model:                    # TODO (Gap 3): ollama/<model>:<size>
       api_base: os.environ/OLLAMA_BASE_URL
- 
-    model_info:
-      input_cost_per_token: 0.00000030
-      output_cost_per_token: 0.00000030
- 
- 
- 
+      health_check_interval:    # TODO (Gap 4): same value as the other tiers, or justify a different one
+
 router_settings:
- 
-  routing_strategy: least-busy
- 
-  allowed_fails: 3
-  cooldown_time: 60
- 
+
+  # --- Gap 5 (routing strategy) ----------------------------------------
+  # How LiteLLM picks between healthy replicas of a tier when more than
+  # one is available. This is a single-replica lab, so the practical
+  # effect is mainly on how load balancing/health is evaluated.
+  routing_strategy:              # TODO (Gap 5): e.g. "least-busy", "usage-based-routing", "simple-shuffle"
+
+  # --- Gap 6 (circuit-breaker failure threshold) -----------------------
+  # Number of consecutive failed health checks before LiteLLM marks a
+  # tier unhealthy and starts routing to its fallback instead.
+  # Too high  -> failing requests pile up before the breaker trips.
+  # Too low   -> a brief blip needlessly diverts traffic to a weaker tier.
+  allowed_fails:                 # TODO (Gap 6)
+
+  # --- Gap 7 (circuit-breaker recovery timeout) ------------------------
+  # Seconds a tier is skipped after tripping, before LiteLLM retries it.
+  cooldown_time:                 # TODO (Gap 7)
+
+  # --- Gaps 8 & 9 (fallback chain) --------------------------------------
+  # What a request falls back to when its assigned tier is unhealthy.
+  # Do not rename the tiers — only decide the order.
   fallbacks:
- 
     - complex-tier:
-        - standard-tier
-        - simple-tier
- 
+        -                       # TODO (Gap 8): first fallback for complex-tier
+        -                       # TODO (Gap 8): second fallback for complex-tier
     - standard-tier:
-        - simple-tier
- 
- 
- 
+        -                       # TODO (Gap 9): fallback for standard-tier
+
+  # --- Gap 10 (per-BU budgets / rate limits) ---------------------------
+  # Prevents one business unit (hr / it / finance) from exhausting the
+  # shared VM's capacity or overspending. Add one virtual key per BU
+  # with a monthly budget and/or request-rate limit.
+  # TODO (Gap 10): add a virtual_keys (or equivalent) block below.
+  #
+  # Example shape (replace with your own real values per BU):
+  # virtual_keys:
+  #   - key_alias: hr
+  #     max_budget:             # e.g. monthly USD-equivalent cap
+  #     budget_duration:        # e.g. "30d"
+  #     rpm_limit:
+  #     tpm_limit:
+  #   - key_alias: it
+  #     max_budget:
+  #     budget_duration:
+  #     rpm_limit:
+  #     tpm_limit:
+  #   - key_alias: finance
+  #     max_budget:
+  #     budget_duration:
+  #     rpm_limit:
+  #     tpm_limit:
+
 litellm_settings:
- 
   success_callback:
     - langfuse
- 
-  langfuse_default_tags:
-    - "employee-ai"
- 
-  set_verbose:
-    true
- 
- 
- 
+  # success_callback must stay "langfuse" — this is what sends every
+  # completion to LangFuse as a trace. It only works once .env has real
+  # LANGFUSE_PUBLIC_KEY / LANGFUSE_SECRET_KEY values (see .env, mandatory
+  # edit). Do not remove this line.
+
 general_settings:
   master_key: os.environ/LITELLM_MASTER_KEY
+  # Reads LITELLM_MASTER_KEY from .env — this must be a real value you
+  # set yourself (see .env, mandatory edit), not the placeholder.
