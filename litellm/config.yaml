@@ -2,36 +2,35 @@
 #
 # LIVE CONFIG — LiteLLM loads this file directly. Every value you set here
 # changes the chatbot's real routing, fallback, and cost-control behavior.
-# Do not rename model_name, tier labels, or top-level keys — the grader
-# depends on these exact names.
+# Do not rename top-level keys — the grader depends on these exact names.
 #
-# Fill every # TODO (Gap N) below. Gaps 1-4 size the three model tiers,
+# Fill every # TODO (Gap N) below. Gaps 1-4 size the model choices,
 # Gaps 5-9 configure routing/fallback, Gap 10 enforces per-BU budgets.
 
 model_list:
 
-  # --- Gap 1 (model choice — Simple tier) ------------------------------
+  # --- Gap 1 (model choice — simple tier) ------------------------------
   # Simple tier: the smallest model you pulled in Step 3. Handles
   # high-volume, low-complexity requests (FAQs, lookups, greetings).
-  - model_name: simple-tier
+  - model_name:                         # TODO (Gap 1): name for simple tier
     litellm_params:
       model:                    # TODO (Gap 1): ollama/<model>:<size>
       api_base: os.environ/OLLAMA_BASE_URL
       health_check_interval:    # TODO (Gap 4): seconds between Ollama health checks
 
-  # --- Gap 2 (model choice — Standard tier) ----------------------------
+  # --- Gap 2 (model choice — standard tier) ----------------------------
   # Standard tier: mid-capability model for everyday multi-step questions
   # (report generation, troubleshooting, policy explanation).
-  - model_name: standard-tier
+  - model_name:                         # TODO (Gap 2): name for standard tier
     litellm_params:
       model:                    # TODO (Gap 2): ollama/<model>:<size>
       api_base: os.environ/OLLAMA_BASE_URL
-      health_check_interval:    # TODO (Gap 4): same value as Simple tier, or justify a different one
+      health_check_interval:    # TODO (Gap 4): same value as simple tier, or justify a different one
 
-  # --- Gap 3 (model choice — Complex tier) -----------------------------
+  # --- Gap 3 (model choice — complex tier) -----------------------------
   # Complex tier: reserved for the hardest, highest-stakes questions
   # (policy interpretation, financial analysis, compliance, escalations).
-  - model_name: complex-tier
+  - model_name:                         # TODO (Gap 3): name for complex tier
     litellm_params:
       model:                    # TODO (Gap 3): ollama/<model>:<size>
       api_base: os.environ/OLLAMA_BASE_URL
@@ -40,7 +39,7 @@ model_list:
 router_settings:
 
   # --- Gap 5 (routing strategy) ----------------------------------------
-  # How LiteLLM picks between healthy replicas of a tier when more than
+  # How LiteLLM picks between healthy replicas when more than
   # one is available. This is a single-replica lab, so the practical
   # effect is mainly on how load balancing/health is evaluated.
   routing_strategy:              # TODO (Gap 5): e.g. "least-busy", "usage-based-routing", "simple-shuffle"
@@ -58,37 +57,14 @@ router_settings:
 
   # --- Gaps 8 & 9 (fallback chain) --------------------------------------
   # What a request falls back to when its assigned tier is unhealthy.
-  # Do not rename the tiers — only decide the order.
-  fallbacks:
-    - complex-tier:
-        -                       # TODO (Gap 8): first fallback for complex-tier
-        -                       # TODO (Gap 8): second fallback for complex-tier
-    - standard-tier:
-        -                       # TODO (Gap 9): fallback for standard-tier
+  # Decide the fallback order for complex tier and standard tier.
+  fallbacks:                     # TODO (Gaps 8 & 9): configure fallback chain for complex tier and standard tier
 
   # --- Gap 10 (per-BU budgets / rate limits) ---------------------------
   # Prevents one business unit (hr / it / finance) from exhausting the
   # shared VM's capacity or overspending. Add one virtual key per BU
   # with a monthly budget and/or request-rate limit.
   # TODO (Gap 10): add a virtual_keys (or equivalent) block below.
-  #
-  # Example shape (replace with your own real values per BU):
-  # virtual_keys:
-  #   - key_alias: hr
-  #     max_budget:             # e.g. monthly USD-equivalent cap
-  #     budget_duration:        # e.g. "30d"
-  #     rpm_limit:
-  #     tpm_limit:
-  #   - key_alias: it
-  #     max_budget:
-  #     budget_duration:
-  #     rpm_limit:
-  #     tpm_limit:
-  #   - key_alias: finance
-  #     max_budget:
-  #     budget_duration:
-  #     rpm_limit:
-  #     tpm_limit:
 
 litellm_settings:
   success_callback:
