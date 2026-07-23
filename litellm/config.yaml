@@ -66,6 +66,13 @@ router_settings:
   # with a monthly budget and/or request-rate limit.
   # TODO (Gap 10): add a virtual_keys (or equivalent) block below.
 
+# virtual_keys:
+#   - key_alias:                        # TODO: BU key name (e.g. hr)
+#     max_budget:                       # TODO: budget limit
+#     budget_duration:                  # TODO: duration (e.g. "30d")
+#     rpm_limit:                        # TODO: request limit per minute
+#     tpm_limit:                        # TODO: token limit per minute
+
 litellm_settings:
   success_callback:
     - langfuse
